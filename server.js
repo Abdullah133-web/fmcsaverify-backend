@@ -1,14 +1,14 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
 const cors = require('cors');
-
 const app = express();
-app.use(cors());
-
 const PORT = process.env.PORT || 5000;
 
-app.get('/verify/:dot', async (req, res) => {
-  const dotNumber = req.params.dot;
+app.use(cors());
+app.use(express.json());
+
+app.post('/', async (req, res) => {
+  const dotNumber = req.body.dotNumber;
   if (!dotNumber) return res.status(400).json({ error: 'DOT number required' });
 
   const url = `https://safer.fmcsa.dot.gov/query.asp?searchtype=ANY&query_param=USDOT&query_string=${dotNumber}`;
@@ -18,14 +18,13 @@ app.get('/verify/:dot', async (req, res) => {
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
-
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded' });
 
     const content = await page.content();
 
     const legalNameMatch = content.match(/<b>Legal Name:<\/b>\s*(.*?)<br>/i);
-    const statusMatch = content.match(/<b>Operating Status:<\/b>\s*(.*?)<br>/i);
+    const statusMatch = content.match(/Operating Authority Status:<\/b>\s*(.*?)<br>/i);
 
     await browser.close();
 
@@ -39,13 +38,9 @@ app.get('/verify/:dot', async (req, res) => {
       operating_status: statusMatch[1].trim(),
     });
   } catch (err) {
-    console.error('Scraper error:', err.message);
+    console.error(err);
     res.status(500).json({ error: 'Failed to fetch data' });
   }
-});
-
-app.get('/', (req, res) => {
-  res.send('✅ FMCSA backend is running!');
 });
 
 app.listen(PORT, () => {
